@@ -19,6 +19,8 @@ EXTENSION_MAP = {
     "Kod": {".py", ".js", ".ts", ".html", ".css", ".json", ".java", ".c", ".cpp"},
 }
 
+CATEGORY_NAMES = set(EXTENSION_MAP) | {"Diger"}
+
 
 def get_category(extension: str) -> str:
     ext = extension.lower()
@@ -41,21 +43,36 @@ def unique_destination(dst: Path) -> Path:
     return candidate
 
 
-def plan_moves(folder: Path) -> list[tuple[Path, Path]]:
+def iter_source_files(folder: Path, recursive: bool):
+    """Klasördeki (isteğe bağlı olarak alt klasörlerdeki) dosyaları dolaşır.
+    Daha önce oluşturduğumuz kategori klasörlerinin içini tekrar işlemez."""
+    if not recursive:
+        yield from (item for item in folder.iterdir() if item.is_file())
+        return
+    for item in folder.rglob("*"):
+        if not item.is_file():
+            continue
+        if item.parent.name in CATEGORY_NAMES and item.parent.parent == folder:
+            continue
+        yield item
+
+
+def plan_moves(folder: Path, recursive: bool = False) -> list[tuple[Path, Path]]:
     """Klasördeki dosyalar için (kaynak, hedef) çiftlerini döner. Hiçbir şeyi taşımaz."""
     moves = []
-    for item in folder.iterdir():
-        if item.is_file():
-            category = get_category(item.suffix)
-            target_dir = folder / category
-            target_path = target_dir / item.name
-            moves.append((item, target_path))
+    for item in iter_source_files(folder, recursive):
+        category = get_category(item.suffix)
+        target_dir = folder / category
+        target_path = target_dir / item.name
+        moves.append((item, target_path))
     return moves
 
 
-def organize(folder: Path, dry_run: bool = False) -> list[tuple[Path, Path]]:
-    moves = plan_moves(folder)
+def organize(folder: Path, dry_run: bool = False, recursive: bool = False) -> list[tuple[Path, Path]]:
+    moves = plan_moves(folder, recursive=recursive)
     for src, dst in moves:
+        if src == dst:
+            continue
         if dry_run:
             print(f"[DRY-RUN] {src.name} -> {dst.parent.name}/")
             continue
@@ -70,6 +87,7 @@ def main():
     parser = argparse.ArgumentParser(description="Dosyaları uzantılarına göre klasörlere ayırır.")
     parser.add_argument("folder", type=str, help="Düzenlenecek klasörün yolu")
     parser.add_argument("--dry-run", action="store_true", help="Sadece ne yapılacağını göster, taşıma")
+    parser.add_argument("-r", "--recursive", action="store_true", help="Alt klasörleri de tara")
     args = parser.parse_args()
 
     folder = Path(args.folder).expanduser().resolve()
@@ -77,7 +95,7 @@ def main():
         print(f"Hata: '{folder}' bir klasör değil veya bulunamadı.")
         return
 
-    organize(folder, dry_run=args.dry_run)
+    organize(folder, dry_run=args.dry_run, recursive=args.recursive)
 
 
 if __name__ == "__main__":

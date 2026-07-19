@@ -57,3 +57,25 @@ def test_organize_conflict_renames_instead_of_overwrite(tmp_path):
 
     assert (tmp_path / "Resimler" / "foto.jpg").read_text() == "eski"
     assert (tmp_path / "Resimler" / "foto(1).jpg").read_text() == "yeni"
+
+
+def test_organize_recursive_finds_subfolder_files(tmp_path):
+    sub = tmp_path / "alt"
+    sub.mkdir()
+    (sub / "video.mp4").write_text("x")
+
+    organize(tmp_path, dry_run=False, recursive=True)
+
+    assert (tmp_path / "Videolar" / "video.mp4").exists()
+    assert not (sub / "video.mp4").exists()
+
+
+def test_organize_recursive_does_not_reprocess_own_output(tmp_path):
+    (tmp_path / "kod.py").write_text("x")
+    organize(tmp_path, dry_run=False, recursive=True)
+
+    # ikinci çalıştırma zaten organize edilmiş dosyayı tekrar taşımaya çalışmamalı
+    organize(tmp_path, dry_run=False, recursive=True)
+
+    assert (tmp_path / "Kod" / "kod.py").exists()
+    assert not (tmp_path / "Kod" / "Kod").exists()
