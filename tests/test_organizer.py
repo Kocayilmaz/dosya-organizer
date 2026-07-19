@@ -1,9 +1,10 @@
+import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from organizer import get_category, plan_moves, organize, unique_destination
+from organizer import get_category, plan_moves, organize, unique_destination, load_extension_map
 
 
 def test_get_category_resim():
@@ -90,3 +91,22 @@ def test_organize_by_date_creates_month_subfolder(tmp_path):
     assert len(subfolders) == 1
     assert subfolders[0].is_dir()
     assert (subfolders[0] / "belge.txt").exists()
+
+
+def test_custom_config_overrides_categories(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"OzelKategori": [".xyz"]}))
+
+    extension_map = load_extension_map(str(config_path))
+    assert get_category(".xyz", extension_map) == "OzelKategori"
+
+
+def test_organize_with_custom_config(tmp_path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"OzelKategori": [".xyz"]}))
+    (tmp_path / "not.xyz").write_text("x")
+
+    extension_map = load_extension_map(str(config_path))
+    organize(tmp_path, dry_run=False, extension_map=extension_map)
+
+    assert (tmp_path / "OzelKategori" / "not.xyz").exists()

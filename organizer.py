@@ -7,6 +7,7 @@ Kullanım:
     python organizer.py /path/to/klasor --dry-run
 """
 import argparse
+import json
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -23,12 +24,22 @@ EXTENSION_MAP = {
 CATEGORY_NAMES = set(EXTENSION_MAP) | {"Diger"}
 
 
-def get_category(extension: str) -> str:
+def get_category(extension: str, extension_map: dict = EXTENSION_MAP) -> str:
     ext = extension.lower()
-    for category, extensions in EXTENSION_MAP.items():
+    for category, extensions in extension_map.items():
         if ext in extensions:
             return category
     return "Diger"
+
+
+def load_extension_map(config_path: str | None) -> dict:
+    """--config ile verilen JSON dosyasından {kategori: [uzantılar]} eşlemesini yükler.
+    Verilmezse varsayılan EXTENSION_MAP kullanılır."""
+    if not config_path:
+        return EXTENSION_MAP
+    with open(config_path, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    return {category: set(extensions) for category, extensions in raw.items()}
 
 
 def unique_destination(dst: Path) -> Path:
@@ -58,11 +69,12 @@ def iter_source_files(folder: Path, recursive: bool):
         yield item
 
 
-def plan_moves(folder: Path, recursive: bool = False, by_date: bool = False) -> list[tuple[Path, Path]]:
+def plan_moves(folder: Path, recursive: bool = False, by_date: bool = False,
+               extension_map: dict = EXTENSION_MAP) -> list[tuple[Path, Path]]:
     """Klasördeki dosyalar için (kaynak, hedef) çiftlerini döner. Hiçbir şeyi taşımaz."""
     moves = []
     for item in iter_source_files(folder, recursive):
-        category = get_category(item.suffix)
+        category = get_category(item.suffix, extension_map)
         target_dir = folder / category
         if by_date:
             mtime = datetime.fromtimestamp(item.stat().st_mtime)
@@ -72,8 +84,9 @@ def plan_moves(folder: Path, recursive: bool = False, by_date: bool = False) -> 
     return moves
 
 
-def organize(folder: Path, dry_run: bool = False, recursive: bool = False, by_date: bool = False) -> list[tuple[Path, Path]]:
-    moves = plan_moves(folder, recursive=recursive, by_date=by_date)
+def organize(folder: Path, dry_run: bool = False, recursive: bool = False, by_date: bool = False,
+             extension_map: dict = EXTENSION_MAP) -> list[tuple[Path, Path]]:
+    moves = plan_moves(folder, recursive=recursive, by_date=by_date, extension_map=extension_map)
     for src, dst in moves:
         if src == dst:
             continue
@@ -93,6 +106,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Sadece ne yapılacağını göster, taşıma")
     parser.add_argument("-r", "--recursive", action="store_true", help="Alt klasörleri de tara")
     parser.add_argument("--by-date", action="store_true", help="Kategori içinde ayrıca YYYY-AA klasörlerine ayır")
+    parser.add_argument("--config", type=str, default=None, help="Özel kategori/uzantı eşlemesi içeren JSON dosyası")
     args = parser.parse_args()
 
     folder = Path(args.folder).expanduser().resolve()
@@ -100,7 +114,8 @@ def main():
         print(f"Hata: '{folder}' bir klasör değil veya bulunamadı.")
         return
 
-    organize(folder, dry_run=args.dry_run, recursive=args.recursive, by_date=args.by_date)
+    extension_map = load_extension_map(args.config)
+    organize(folder, dry_run=args.dry_run, recursive=args.recursive, by_date=args.by_date, extension_map=extension_map)
 
 
 if __name__ == "__main__":
