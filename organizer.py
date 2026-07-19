@@ -23,6 +23,8 @@ EXTENSION_MAP = {
 
 CATEGORY_NAMES = set(EXTENSION_MAP) | {"Diger"}
 
+LOG_FILENAME = ".organizer_log.json"
+
 
 def get_category(extension: str, extension_map: dict = EXTENSION_MAP) -> str:
     ext = extension.lower()
@@ -87,6 +89,7 @@ def plan_moves(folder: Path, recursive: bool = False, by_date: bool = False,
 def organize(folder: Path, dry_run: bool = False, recursive: bool = False, by_date: bool = False,
              extension_map: dict = EXTENSION_MAP) -> list[tuple[Path, Path]]:
     moves = plan_moves(folder, recursive=recursive, by_date=by_date, extension_map=extension_map)
+    performed = []
     for src, dst in moves:
         if src == dst:
             continue
@@ -97,7 +100,37 @@ def organize(folder: Path, dry_run: bool = False, recursive: bool = False, by_da
         dst = unique_destination(dst)
         shutil.move(str(src), str(dst))
         print(f"Taşındı: {src.name} -> {dst.parent.name}/")
+        performed.append((str(src), str(dst)))
+
+    if not dry_run and performed:
+        write_log(folder, performed)
     return moves
+
+
+def write_log(folder: Path, performed: list[tuple[str, str]]) -> None:
+    log_path = folder / LOG_FILENAME
+    with open(log_path, "w", encoding="utf-8") as f:
+        json.dump(performed, f, ensure_ascii=False, indent=2)
+
+
+def undo(folder: Path) -> int:
+    """Son organize() çalışmasında yapılan taşımaları geri alır. Kaç dosya geri alındığını döner."""
+    log_path = folder / LOG_FILENAME
+    if not log_path.exists():
+        return 0
+    with open(log_path, "r", encoding="utf-8") as f:
+        performed = json.load(f)
+
+    restored = 0
+    for src, dst in reversed(performed):
+        src_path, dst_path = Path(src), Path(dst)
+        if dst_path.exists():
+            src_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(dst_path), str(src_path))
+            restored += 1
+
+    log_path.unlink()
+    return restored
 
 
 def main():
@@ -107,11 +140,17 @@ def main():
     parser.add_argument("-r", "--recursive", action="store_true", help="Alt klasörleri de tara")
     parser.add_argument("--by-date", action="store_true", help="Kategori içinde ayrıca YYYY-AA klasörlerine ayır")
     parser.add_argument("--config", type=str, default=None, help="Özel kategori/uzantı eşlemesi içeren JSON dosyası")
+    parser.add_argument("--undo", action="store_true", help="Son organize işlemini geri al")
     args = parser.parse_args()
 
     folder = Path(args.folder).expanduser().resolve()
     if not folder.is_dir():
         print(f"Hata: '{folder}' bir klasör değil veya bulunamadı.")
+        return
+
+    if args.undo:
+        restored = undo(folder)
+        print(f"{restored} dosya geri alındı." if restored else "Geri alınacak bir işlem kaydı bulunamadı.")
         return
 
     extension_map = load_extension_map(args.config)

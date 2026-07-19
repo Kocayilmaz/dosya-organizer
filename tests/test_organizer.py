@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from organizer import get_category, plan_moves, organize, unique_destination, load_extension_map
+from organizer import get_category, plan_moves, organize, unique_destination, load_extension_map, undo
 
 
 def test_get_category_resim():
@@ -110,3 +110,20 @@ def test_organize_with_custom_config(tmp_path):
     organize(tmp_path, dry_run=False, extension_map=extension_map)
 
     assert (tmp_path / "OzelKategori" / "not.xyz").exists()
+
+
+def test_undo_restores_moved_files(tmp_path):
+    (tmp_path / "foto.jpg").write_text("merhaba")
+    organize(tmp_path, dry_run=False)
+    assert (tmp_path / "Resimler" / "foto.jpg").exists()
+
+    restored = undo(tmp_path)
+
+    assert restored == 1
+    assert (tmp_path / "foto.jpg").read_text() == "merhaba"
+    assert not (tmp_path / "Resimler" / "foto.jpg").exists()
+    assert not (tmp_path / ".organizer_log.json").exists()
+
+
+def test_undo_without_log_returns_zero(tmp_path):
+    assert undo(tmp_path) == 0
