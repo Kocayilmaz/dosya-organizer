@@ -9,6 +9,7 @@ Kullanım:
 import argparse
 import json
 import shutil
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -104,7 +105,20 @@ def organize(folder: Path, dry_run: bool = False, recursive: bool = False, by_da
 
     if not dry_run and performed:
         write_log(folder, performed)
+
+    print_summary(moves, dry_run)
     return moves
+
+
+def print_summary(moves: list[tuple[Path, Path]], dry_run: bool) -> None:
+    if not moves:
+        print("Taşınacak dosya bulunamadı.")
+        return
+    counts = Counter(dst.parent.name for _, dst in moves)
+    prefix = "[DRY-RUN] " if dry_run else ""
+    print(f"\n{prefix}Özet ({len(moves)} dosya):")
+    for category, count in sorted(counts.items()):
+        print(f"  {category}: {count}")
 
 
 def write_log(folder: Path, performed: list[tuple[str, str]]) -> None:

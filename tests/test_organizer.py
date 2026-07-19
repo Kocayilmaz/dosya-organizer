@@ -127,3 +127,15 @@ def test_undo_restores_moved_files(tmp_path):
 
 def test_undo_without_log_returns_zero(tmp_path):
     assert undo(tmp_path) == 0
+
+
+def test_organize_prints_summary(tmp_path, capsys):
+    (tmp_path / "foto.jpg").write_text("x")
+    (tmp_path / "rapor.pdf").write_text("x")
+
+    organize(tmp_path, dry_run=False)
+
+    output = capsys.readouterr().out
+    assert "Özet (2 dosya)" in output
+    assert "Resimler: 1" in output
+    assert "Belgeler: 1" in output
