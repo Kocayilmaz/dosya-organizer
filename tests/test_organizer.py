@@ -79,3 +79,14 @@ def test_organize_recursive_does_not_reprocess_own_output(tmp_path):
 
     assert (tmp_path / "Kod" / "kod.py").exists()
     assert not (tmp_path / "Kod" / "Kod").exists()
+
+
+def test_organize_by_date_creates_month_subfolder(tmp_path):
+    (tmp_path / "belge.txt").write_text("x")
+    organize(tmp_path, dry_run=False, by_date=True)
+
+    belgeler_dir = tmp_path / "Belgeler"
+    subfolders = list(belgeler_dir.iterdir())
+    assert len(subfolders) == 1
+    assert subfolders[0].is_dir()
+    assert (subfolders[0] / "belge.txt").exists()

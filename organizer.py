@@ -8,6 +8,7 @@ Kullanım:
 """
 import argparse
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 EXTENSION_MAP = {
@@ -57,26 +58,29 @@ def iter_source_files(folder: Path, recursive: bool):
         yield item
 
 
-def plan_moves(folder: Path, recursive: bool = False) -> list[tuple[Path, Path]]:
+def plan_moves(folder: Path, recursive: bool = False, by_date: bool = False) -> list[tuple[Path, Path]]:
     """Klasördeki dosyalar için (kaynak, hedef) çiftlerini döner. Hiçbir şeyi taşımaz."""
     moves = []
     for item in iter_source_files(folder, recursive):
         category = get_category(item.suffix)
         target_dir = folder / category
+        if by_date:
+            mtime = datetime.fromtimestamp(item.stat().st_mtime)
+            target_dir = target_dir / mtime.strftime("%Y-%m")
         target_path = target_dir / item.name
         moves.append((item, target_path))
     return moves
 
 
-def organize(folder: Path, dry_run: bool = False, recursive: bool = False) -> list[tuple[Path, Path]]:
-    moves = plan_moves(folder, recursive=recursive)
+def organize(folder: Path, dry_run: bool = False, recursive: bool = False, by_date: bool = False) -> list[tuple[Path, Path]]:
+    moves = plan_moves(folder, recursive=recursive, by_date=by_date)
     for src, dst in moves:
         if src == dst:
             continue
         if dry_run:
             print(f"[DRY-RUN] {src.name} -> {dst.parent.name}/")
             continue
-        dst.parent.mkdir(exist_ok=True)
+        dst.parent.mkdir(parents=True, exist_ok=True)
         dst = unique_destination(dst)
         shutil.move(str(src), str(dst))
         print(f"Taşındı: {src.name} -> {dst.parent.name}/")
@@ -88,6 +92,7 @@ def main():
     parser.add_argument("folder", type=str, help="Düzenlenecek klasörün yolu")
     parser.add_argument("--dry-run", action="store_true", help="Sadece ne yapılacağını göster, taşıma")
     parser.add_argument("-r", "--recursive", action="store_true", help="Alt klasörleri de tara")
+    parser.add_argument("--by-date", action="store_true", help="Kategori içinde ayrıca YYYY-AA klasörlerine ayır")
     args = parser.parse_args()
 
     folder = Path(args.folder).expanduser().resolve()
@@ -95,7 +100,7 @@ def main():
         print(f"Hata: '{folder}' bir klasör değil veya bulunamadı.")
         return
 
-    organize(folder, dry_run=args.dry_run, recursive=args.recursive)
+    organize(folder, dry_run=args.dry_run, recursive=args.recursive, by_date=args.by_date)
 
 
 if __name__ == "__main__":
