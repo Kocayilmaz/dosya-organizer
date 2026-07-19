@@ -9,6 +9,8 @@ Kullanım:
 import argparse
 import json
 import shutil
+import sys
+import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -147,6 +149,33 @@ def undo(folder: Path) -> int:
     return restored
 
 
+def watch(folder: Path, recursive: bool = False, by_date: bool = False,
+          extension_map: dict = EXTENSION_MAP) -> None:
+    """Klasörü sürekli izler, yeni dosya düştükçe otomatik organize eder. Ctrl+C ile durur."""
+    try:
+        from watchdog.events import FileSystemEventHandler
+        from watchdog.observers import Observer
+    except ImportError:
+        print("--watch için 'watchdog' paketi gerekli: pip install watchdog")
+        sys.exit(1)
+
+    class Handler(FileSystemEventHandler):
+        def on_created(self, event):
+            if not event.is_directory:
+                organize(folder, dry_run=False, recursive=recursive, by_date=by_date, extension_map=extension_map)
+
+    print(f"'{folder}' izleniyor... Durdurmak için Ctrl+C.")
+    observer = Observer()
+    observer.schedule(Handler(), str(folder), recursive=recursive)
+    observer.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Dosyaları uzantılarına göre klasörlere ayırır.")
     parser.add_argument("folder", type=str, help="Düzenlenecek klasörün yolu")
@@ -155,6 +184,7 @@ def main():
     parser.add_argument("--by-date", action="store_true", help="Kategori içinde ayrıca YYYY-AA klasörlerine ayır")
     parser.add_argument("--config", type=str, default=None, help="Özel kategori/uzantı eşlemesi içeren JSON dosyası")
     parser.add_argument("--undo", action="store_true", help="Son organize işlemini geri al")
+    parser.add_argument("--watch", action="store_true", help="Klasörü sürekli izleyip yeni dosyaları otomatik organize et")
     args = parser.parse_args()
 
     folder = Path(args.folder).expanduser().resolve()
@@ -168,6 +198,11 @@ def main():
         return
 
     extension_map = load_extension_map(args.config)
+
+    if args.watch:
+        watch(folder, recursive=args.recursive, by_date=args.by_date, extension_map=extension_map)
+        return
+
     organize(folder, dry_run=args.dry_run, recursive=args.recursive, by_date=args.by_date, extension_map=extension_map)
 
 

@@ -4,7 +4,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from organizer import get_category, plan_moves, organize, unique_destination, load_extension_map, undo
+import pytest
+
+from organizer import get_category, plan_moves, organize, unique_destination, load_extension_map, undo, watch
 
 
 def test_get_category_resim():
@@ -139,3 +141,16 @@ def test_organize_prints_summary(tmp_path, capsys):
     assert "Özet (2 dosya)" in output
     assert "Resimler: 1" in output
     assert "Belgeler: 1" in output
+
+
+def test_watch_without_watchdog_exits_with_hint(tmp_path, capsys):
+    try:
+        import watchdog  # noqa: F401
+        pytest.skip("watchdog kurulu, eksik-bağımlılık senaryosu test edilemiyor")
+    except ImportError:
+        pass
+
+    with pytest.raises(SystemExit):
+        watch(tmp_path)
+
+    assert "pip install watchdog" in capsys.readouterr().out
