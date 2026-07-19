@@ -28,6 +28,19 @@ def get_category(extension: str) -> str:
     return "Diger"
 
 
+def unique_destination(dst: Path) -> Path:
+    """dst zaten varsa üzerine yazmak yerine 'isim(1).ext' gibi çakışmayan bir yol üretir."""
+    if not dst.exists():
+        return dst
+    stem, suffix, parent = dst.stem, dst.suffix, dst.parent
+    counter = 1
+    candidate = parent / f"{stem}({counter}){suffix}"
+    while candidate.exists():
+        counter += 1
+        candidate = parent / f"{stem}({counter}){suffix}"
+    return candidate
+
+
 def plan_moves(folder: Path) -> list[tuple[Path, Path]]:
     """Klasördeki dosyalar için (kaynak, hedef) çiftlerini döner. Hiçbir şeyi taşımaz."""
     moves = []
@@ -47,6 +60,7 @@ def organize(folder: Path, dry_run: bool = False) -> list[tuple[Path, Path]]:
             print(f"[DRY-RUN] {src.name} -> {dst.parent.name}/")
             continue
         dst.parent.mkdir(exist_ok=True)
+        dst = unique_destination(dst)
         shutil.move(str(src), str(dst))
         print(f"Taşındı: {src.name} -> {dst.parent.name}/")
     return moves

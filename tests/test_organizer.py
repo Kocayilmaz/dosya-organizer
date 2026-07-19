@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from organizer import get_category, plan_moves, organize
+from organizer import get_category, plan_moves, organize, unique_destination
 
 
 def test_get_category_resim():
@@ -46,3 +46,14 @@ def test_organize_dry_run_does_not_move(tmp_path):
 
     assert (tmp_path / "foto.jpg").exists()
     assert not (tmp_path / "Resimler").exists()
+
+
+def test_organize_conflict_renames_instead_of_overwrite(tmp_path):
+    (tmp_path / "Resimler").mkdir()
+    (tmp_path / "Resimler" / "foto.jpg").write_text("eski")
+    (tmp_path / "foto.jpg").write_text("yeni")
+
+    organize(tmp_path, dry_run=False)
+
+    assert (tmp_path / "Resimler" / "foto.jpg").read_text() == "eski"
+    assert (tmp_path / "Resimler" / "foto(1).jpg").read_text() == "yeni"
