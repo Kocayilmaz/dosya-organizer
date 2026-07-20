@@ -23,6 +23,7 @@ python organizer.py /path/to/klasor --dry-run
 | `-r`, `--recursive` | Alt klasörleri de tarar (kendi oluşturduğu kategori klasörlerini tekrar işlemez) |
 | `--by-date` | Her kategori içinde ayrıca `YYYY-AA` alt klasörlerine ayırır (dosyanın değiştirilme tarihine göre) |
 | `--config dosya.json` | Varsayılan kategori/uzantı eşlemesi yerine kendi JSON dosyanı kullanır, örn: `{"Tasarim": [".psd", ".ai"]}` |
+| `--dest /baska/klasor` | Kategori klasörlerini kaynak yerine belirtilen hedef klasörün altında oluşturur (verilmezse kaynak klasörün içine organize edilir) |
 | `--undo` | Son `organize` çalışmasında yapılan taşımaları geri alır (`.organizer_log.json` üzerinden) |
 | `--watch` | Klasörü sürekli izler, yeni düşen dosyaları otomatik organize eder (`pip install watchdog` gerekir) |
 

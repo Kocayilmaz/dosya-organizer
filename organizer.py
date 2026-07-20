@@ -60,27 +60,30 @@ def unique_destination(dst: Path) -> Path:
     return candidate
 
 
-def iter_source_files(folder: Path, recursive: bool):
+def iter_source_files(folder: Path, recursive: bool, target_root: Path):
     """Klasördeki (isteğe bağlı olarak alt klasörlerdeki) dosyaları dolaşır.
-    Daha önce oluşturduğumuz kategori klasörlerinin içini tekrar işlemez."""
+    target_root altında daha önce oluşturduğumuz kategori klasörlerinin içini tekrar işlemez
+    (yalnızca kaynak == hedef olduğunda, yani yerinde organize ederken anlamlıdır)."""
     if not recursive:
         yield from (item for item in folder.iterdir() if item.is_file())
         return
     for item in folder.rglob("*"):
         if not item.is_file():
             continue
-        if item.parent.name in CATEGORY_NAMES and item.parent.parent == folder:
+        if item.parent.name in CATEGORY_NAMES and item.parent.parent == target_root:
             continue
         yield item
 
 
 def plan_moves(folder: Path, recursive: bool = False, by_date: bool = False,
-               extension_map: dict = EXTENSION_MAP) -> list[tuple[Path, Path]]:
-    """Klasördeki dosyalar için (kaynak, hedef) çiftlerini döner. Hiçbir şeyi taşımaz."""
+               extension_map: dict = EXTENSION_MAP, dest: Path | None = None) -> list[tuple[Path, Path]]:
+    """Klasördeki dosyalar için (kaynak, hedef) çiftlerini döner. Hiçbir şeyi taşımaz.
+    dest verilirse kategori klasörleri kaynak yerine dest altında oluşturulur."""
+    target_root = dest if dest is not None else folder
     moves = []
-    for item in iter_source_files(folder, recursive):
+    for item in iter_source_files(folder, recursive, target_root):
         category = get_category(item.suffix, extension_map)
-        target_dir = folder / category
+        target_dir = target_root / category
         if by_date:
             mtime = datetime.fromtimestamp(item.stat().st_mtime)
             target_dir = target_dir / mtime.strftime("%Y-%m")
@@ -90,8 +93,8 @@ def plan_moves(folder: Path, recursive: bool = False, by_date: bool = False,
 
 
 def organize(folder: Path, dry_run: bool = False, recursive: bool = False, by_date: bool = False,
-             extension_map: dict = EXTENSION_MAP) -> list[tuple[Path, Path]]:
-    moves = plan_moves(folder, recursive=recursive, by_date=by_date, extension_map=extension_map)
+             extension_map: dict = EXTENSION_MAP, dest: Path | None = None) -> list[tuple[Path, Path]]:
+    moves = plan_moves(folder, recursive=recursive, by_date=by_date, extension_map=extension_map, dest=dest)
     performed = []
     for src, dst in moves:
         if src == dst:
@@ -150,7 +153,7 @@ def undo(folder: Path) -> int:
 
 
 def watch(folder: Path, recursive: bool = False, by_date: bool = False,
-          extension_map: dict = EXTENSION_MAP) -> None:
+          extension_map: dict = EXTENSION_MAP, dest: Path | None = None) -> None:
     """Klasörü sürekli izler, yeni dosya düştükçe otomatik organize eder. Ctrl+C ile durur."""
     try:
         from watchdog.events import FileSystemEventHandler
@@ -162,7 +165,8 @@ def watch(folder: Path, recursive: bool = False, by_date: bool = False,
     class Handler(FileSystemEventHandler):
         def on_created(self, event):
             if not event.is_directory:
-                organize(folder, dry_run=False, recursive=recursive, by_date=by_date, extension_map=extension_map)
+                organize(folder, dry_run=False, recursive=recursive, by_date=by_date,
+                          extension_map=extension_map, dest=dest)
 
     print(f"'{folder}' izleniyor... Durdurmak için Ctrl+C.")
     observer = Observer()
@@ -183,6 +187,8 @@ def main():
     parser.add_argument("-r", "--recursive", action="store_true", help="Alt klasörleri de tara")
     parser.add_argument("--by-date", action="store_true", help="Kategori içinde ayrıca YYYY-AA klasörlerine ayır")
     parser.add_argument("--config", type=str, default=None, help="Özel kategori/uzantı eşlemesi içeren JSON dosyası")
+    parser.add_argument("--dest", type=str, default=None,
+                         help="Kategori klasörlerinin oluşturulacağı hedef klasör (verilmezse kaynak klasörün içine organize edilir)")
     parser.add_argument("--undo", action="store_true", help="Son organize işlemini geri al")
     parser.add_argument("--watch", action="store_true", help="Klasörü sürekli izleyip yeni dosyaları otomatik organize et")
     args = parser.parse_args()
@@ -198,12 +204,14 @@ def main():
         return
 
     extension_map = load_extension_map(args.config)
+    dest = Path(args.dest).expanduser().resolve() if args.dest else None
 
     if args.watch:
-        watch(folder, recursive=args.recursive, by_date=args.by_date, extension_map=extension_map)
+        watch(folder, recursive=args.recursive, by_date=args.by_date, extension_map=extension_map, dest=dest)
         return
 
-    organize(folder, dry_run=args.dry_run, recursive=args.recursive, by_date=args.by_date, extension_map=extension_map)
+    organize(folder, dry_run=args.dry_run, recursive=args.recursive, by_date=args.by_date,
+              extension_map=extension_map, dest=dest)
 
 
 if __name__ == "__main__":

@@ -143,6 +143,67 @@ def test_organize_prints_summary(tmp_path, capsys):
     assert "Belgeler: 1" in output
 
 
+def test_organize_with_dest_moves_to_separate_root(tmp_path):
+    src = tmp_path / "kaynak"
+    dest = tmp_path / "hedef"
+    src.mkdir()
+    (src / "foto.jpg").write_text("x")
+
+    organize(src, dry_run=False, dest=dest)
+
+    assert (dest / "Resimler" / "foto.jpg").exists()
+    assert not (src / "foto.jpg").exists()
+    assert not (src / "Resimler").exists()
+
+
+def test_organize_without_dest_organizes_in_place(tmp_path):
+    (tmp_path / "foto.jpg").write_text("x")
+
+    organize(tmp_path, dry_run=False, dest=None)
+
+    assert (tmp_path / "Resimler" / "foto.jpg").exists()
+
+
+def test_organize_recursive_with_dest_does_not_reprocess_own_output(tmp_path):
+    src = tmp_path / "kaynak"
+    dest = tmp_path / "hedef"
+    src.mkdir()
+    (src / "kod.py").write_text("x")
+
+    organize(src, dry_run=False, recursive=True, dest=dest)
+    organize(src, dry_run=False, recursive=True, dest=dest)
+
+    assert (dest / "Kod" / "kod.py").exists()
+    assert not (dest / "Kod" / "Kod").exists()
+
+
+def test_undo_restores_files_moved_to_custom_dest(tmp_path):
+    src = tmp_path / "kaynak"
+    dest = tmp_path / "hedef"
+    src.mkdir()
+    (src / "foto.jpg").write_text("merhaba")
+
+    organize(src, dry_run=False, dest=dest)
+    assert (dest / "Resimler" / "foto.jpg").exists()
+
+    restored = undo(src)
+
+    assert restored == 1
+    assert (src / "foto.jpg").read_text() == "merhaba"
+    assert not (dest / "Resimler" / "foto.jpg").exists()
+
+
+def test_plan_moves_with_dest_targets_dest_root(tmp_path):
+    src = tmp_path / "kaynak"
+    dest = tmp_path / "hedef"
+    src.mkdir()
+    (src / "rapor.pdf").write_text("x")
+
+    moves = plan_moves(src, dest=dest)
+
+    assert moves[0][1] == dest / "Belgeler" / "rapor.pdf"
+
+
 def test_watch_without_watchdog_exits_with_hint(tmp_path, capsys):
     try:
         import watchdog  # noqa: F401
