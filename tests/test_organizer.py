@@ -204,6 +204,29 @@ def test_plan_moves_with_dest_targets_dest_root(tmp_path):
     assert moves[0][1] == dest / "Belgeler" / "rapor.pdf"
 
 
+def test_organize_does_not_move_its_own_log_file(tmp_path):
+    (tmp_path / "foto.jpg").write_text("x")
+    organize(tmp_path, dry_run=False)
+    assert (tmp_path / ".organizer_log.json").exists()
+
+    (tmp_path / "baska.pdf").write_text("y")
+    organize(tmp_path, dry_run=False)
+
+    assert (tmp_path / ".organizer_log.json").exists()
+    assert not (tmp_path / "Kod" / ".organizer_log.json").exists()
+
+
+def test_organize_recursive_does_not_move_its_own_log_file(tmp_path):
+    (tmp_path / "foto.jpg").write_text("x")
+    organize(tmp_path, dry_run=False, recursive=True)
+
+    (tmp_path / "baska.pdf").write_text("y")
+    organize(tmp_path, dry_run=False, recursive=True)
+
+    assert (tmp_path / ".organizer_log.json").exists()
+    assert not (tmp_path / "Kod" / ".organizer_log.json").exists()
+
+
 def test_watch_without_watchdog_exits_with_hint(tmp_path, capsys):
     try:
         import watchdog  # noqa: F401

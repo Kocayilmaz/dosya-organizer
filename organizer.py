@@ -64,11 +64,12 @@ def iter_source_files(folder: Path, recursive: bool, target_root: Path):
     """Klasördeki (isteğe bağlı olarak alt klasörlerdeki) dosyaları dolaşır.
     target_root altında daha önce oluşturduğumuz kategori klasörlerinin içini tekrar işlemez
     (yalnızca kaynak == hedef olduğunda, yani yerinde organize ederken anlamlıdır)."""
+    log_path = folder / LOG_FILENAME
     if not recursive:
-        yield from (item for item in folder.iterdir() if item.is_file())
+        yield from (item for item in folder.iterdir() if item.is_file() and item != log_path)
         return
     for item in folder.rglob("*"):
-        if not item.is_file():
+        if not item.is_file() or item == log_path:
             continue
         if item.parent.name in CATEGORY_NAMES and item.parent.parent == target_root:
             continue
